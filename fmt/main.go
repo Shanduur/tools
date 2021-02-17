@@ -10,14 +10,17 @@ import (
 	"strings"
 )
 
+//
 const (
-	SUCCESS  = 0
-	FAILURE  = 1
-	FILENAME = "^(.*)\\.(sql)$"
-	INSERT   = "(INSERT INTO).*(\n.*)*(VALUES)"
-	COMMENT  = "([^']--.*)|(\\/\\*.*\\*\\/)"
+	SUCCESS   = 0
+	FAILURE   = 1
+	FILENAME  = "^(.*)\\.(sql)$"
+	INSERT    = "(INSERT INTO).*(\n.*)*(VALUES)"
+	COMMENT   = "([^']--.*)|(\\/\\*.*\\*\\/)"
+	EMPTYLINE = "^( )*$"
 )
 
+// ErrWrongQuerry is
 var ErrWrongQuerry = errors.New("wrong format")
 
 func generateSpace(size int) (out string) {
@@ -37,7 +40,7 @@ func getQuerry(reader *bufio.Reader) (query string, comment string, err error) {
 	if err == io.EOF {
 		return
 	} else if err != nil {
-		err = fmt.Errorf("unable to read string: %v\n", err)
+		err = fmt.Errorf("unable to read string: %v", err)
 		return
 	}
 
@@ -52,6 +55,7 @@ func getQuerry(reader *bufio.Reader) (query string, comment string, err error) {
 		query = strings.ReplaceAll(query, "\n", "")
 		query = strings.ReplaceAll(query, "\r", "")
 	} else {
+		query = strings.TrimSpace(query)
 		query = strings.Trim(query, "\n")
 		query = strings.Trim(query, "\r")
 	}
