@@ -63,6 +63,36 @@ func getQuerry(reader *bufio.Reader) (query string, comment string, err error) {
 	return
 }
 
+func connectWronglySplitted(splits []string) (out string) {
+	for _, s := range splits {
+		if len(out) > 0 {
+			out = fmt.Sprintf("%s,%s", out, s)
+		} else {
+			out = fmt.Sprintf("%s", s)
+		}
+	}
+
+	return
+}
+
+func tryMerge(values []string) (merged []string) {
+	for i := 0; i < len(values); i++ {
+		if strings.Count(values[i], "'") == 1 {
+			for j := i + 1; j < len(values); j++ {
+				if strings.Contains(values[j], "'") {
+					merged = append(merged, connectWronglySplitted(values[i:j+1]))
+					i = j
+					break
+				}
+			}
+		} else {
+			merged = append(merged, values[i])
+		}
+	}
+
+	return
+}
+
 func formatQuerry(query string) (formatted string, err error) {
 	format := "INSERT INTO %v\n" +
 		"     VALUES %v\n"
@@ -79,9 +109,13 @@ func formatQuerry(query string) (formatted string, err error) {
 	splitVals := strings.Split(split[1], ",")
 
 	if len(splitCols) != len(splitVals) {
-		err = ErrWrongQuerry
-		formatted = "-- CHECK FORMAT!\n" + query + "\n-- CHECK FORMAT!"
-		return
+		splitVals = tryMerge(splitVals)
+
+		if len(splitCols) != len(splitVals) {
+			err = ErrWrongQuerry
+			formatted = "-- CHECK FORMAT!\n" + query + "\n-- CHECK FORMAT!"
+			return
+		}
 	}
 
 	var (
