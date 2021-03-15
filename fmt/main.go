@@ -16,7 +16,7 @@ const (
 	FAILURE   = 1
 	FILENAME  = "^(.*)\\.(sql)$"
 	INSERT    = "(INSERT INTO).*(\n.*)*(VALUES)"
-	COMMENT   = "([^']--.*)|(\\/\\*.*\\*\\/)"
+	COMMENT   = "(^--.*)|([^']--.*)|(\\/\\*.*\\*\\/)"
 	EMPTYLINE = "^( )*$"
 )
 
