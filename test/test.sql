@@ -41,3 +41,5 @@ CREATE TABLE TEST (
 );
 INSERT INTO Customers(CustomerName, City, CountryIsSuper)
 VALUES ('Cardinal', 'Sta, vanger', 'No,rway');
+-- INSERT INTO Customers(CustomerName, City, CountryIsSuper)
+-- VALUES ('Cardinal', 'Sta, vanger', 'No,rway');

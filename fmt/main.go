@@ -35,7 +35,7 @@ func generateSpace(size int) (out string) {
 	return out
 }
 
-func getQuerry(reader *bufio.Reader) (query string, comment string, err error) {
+func getQuerry(reader *bufio.Reader) (query string, comment []string, err error) {
 	query, err = reader.ReadString(';')
 	if err == io.EOF {
 		return
@@ -47,9 +47,13 @@ func getQuerry(reader *bufio.Reader) (query string, comment string, err error) {
 	insertReg := regexp.MustCompile(INSERT)
 	if insertReg.Match([]byte(query)) {
 		commReg := regexp.MustCompile(COMMENT)
-		comment = string(commReg.Find([]byte(query)))
-		comment = strings.ReplaceAll(comment, "\n", "")
-		comment = strings.ReplaceAll(comment, "\r", "")
+		b_comment := commReg.FindAll([]byte(query), -1)
+		for _, b := range b_comment {
+			c := strings.ReplaceAll(string(b), "\n", "")
+			strings.ReplaceAll(c, "\r", "")
+
+			comment = append(comment, c)
+		}
 
 		query = commReg.ReplaceAllString(query, "")
 		query = strings.ReplaceAll(query, "\n", "")
@@ -176,8 +180,10 @@ func main() {
 			os.Exit(FAILURE)
 		}
 
-		if len(comment) > 2 {
-			out = append(out, fmt.Sprintf("%v\n", comment))
+		if len(comment) > 0 {
+			for _, c := range comment {
+				out = append(out, fmt.Sprintf("%v\n", c))
+			}
 		}
 
 		query, err = formatQuerry(query)
