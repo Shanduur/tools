@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
-//
 const (
 	SUCCESS   = 0
 	FAILURE   = 1
@@ -20,7 +20,6 @@ const (
 	EMPTYLINE = "^( )*$"
 )
 
-// ErrWrongQuerry is
 var ErrWrongQuerry = errors.New("wrong format")
 
 func generateSpace(size int) (out string) {
@@ -148,76 +147,125 @@ func formatQuerry(query string) (formatted string, err error) {
 	return
 }
 
-func main() {
-	regFileName := regexp.MustCompile(FILENAME)
-	fileName := os.Args[1]
-	if !regFileName.MatchString(fileName) {
-		fmt.Fprintf(os.Stderr, "wrong file name\n")
-		os.Exit(FAILURE)
-	}
-
+func format(fileName string) error {
 	file, err := os.OpenFile(fileName, os.O_RDWR, 0666)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to open file: %v\n", err)
-		os.Exit(FAILURE)
+		return fmt.Errorf("unable to open file: %v\n", err)
 	}
 	defer file.Close()
 	defer file.Sync()
 
 	scanner := bufio.NewReader(file)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to create scanner on file: %v\n", err)
-		os.Exit(FAILURE)
+		return fmt.Errorf("unable to create scanner on file: %v\n", err)
 	}
 
+	regEmptyLine := regexp.MustCompile(EMPTYLINE)
 	var out []string
 	for {
 		query, comment, err := getQuerry(scanner)
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to get query: %v\n", err)
-			os.Exit(FAILURE)
+			return fmt.Errorf("unable to get query: %v\n", err)
 		}
 
 		if len(comment) > 0 {
 			for _, c := range comment {
+				c = regEmptyLine.ReplaceAllString(c, "")
 				out = append(out, fmt.Sprintf("%v\n", c))
 			}
 		}
 
-		query, err = formatQuerry(query)
-		if err == ErrWrongQuerry {
-			out = append(out, fmt.Sprintf("%v\n", query))
-			continue
-		} else if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to format query: %v\n", err)
-			os.Exit(FAILURE)
-		}
+		if len(query) > 0 {
+			query, err = formatQuerry(query)
+			if err == ErrWrongQuerry {
+				out = append(out, fmt.Sprintf("%v\n", query))
+				continue
+			} else if err != nil {
+				return fmt.Errorf("unable to format query: %v\n", err)
+			}
 
-		out = append(out, fmt.Sprintf("%v", query))
+			out = append(out, fmt.Sprintf("%v", query))
+		}
 	}
 
 	err = file.Truncate(0)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to truncate file: %v\n", err)
-		os.Exit(FAILURE)
+		return fmt.Errorf("unable to truncate file: %v\n", err)
 	}
 
 	_, err = file.Seek(0, 0)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to seek begining of file: %v\n", err)
-		os.Exit(FAILURE)
+		return fmt.Errorf("unable to seek begining of file: %v\n", err)
 	}
 
 	writer := bufio.NewWriter(file)
 	for _, o := range out {
 		_, err = writer.WriteString(o)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "unable to write to a file: %v\n", err)
-			os.Exit(FAILURE)
+			return fmt.Errorf("unable to write to a file: %v\n", err)
 		}
 		writer.Flush()
+	}
+
+	return nil
+}
+
+func main() {
+	path := os.Args[1]
+
+	si, err := os.Stat(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to get os stat: %v\n", err)
+	}
+
+	mode := si.Mode()
+
+	switch {
+	case mode.IsDir():
+		var files []string
+
+		err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+			files = append(files, path)
+			return nil
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to format file: %v\n", err)
+			os.Exit(FAILURE)
+		}
+
+		regFileName := regexp.MustCompile(FILENAME)
+
+		isFailure := false
+		for _, f := range files {
+			if !regFileName.MatchString(f) {
+				continue
+			}
+
+			err = format(f)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "unable to format file: %v\n", err)
+				isFailure = true
+			}
+		}
+
+		if isFailure {
+			os.Exit(FAILURE)
+		}
+
+	case mode.IsRegular():
+		regFileName := regexp.MustCompile(FILENAME)
+		if !regFileName.MatchString(path) {
+			fmt.Fprintf(os.Stderr, "wrong file name\n")
+			os.Exit(FAILURE)
+		}
+
+		err = format(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "unable to format file: %v\n", err)
+			os.Exit(FAILURE)
+		}
 	}
 
 	os.Exit(SUCCESS)
